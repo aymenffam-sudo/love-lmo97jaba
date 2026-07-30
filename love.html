@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>I Love You — Romaissaa</title>
+<style>
+  :root{
+    --bg:#05060a;
+    --accent:#ea80b0;
+    --soft-accent: rgba(234,128,176,0.12);
+    --text:#fff;
+  }
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    font-family:"Courier New",monospace;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    color:var(--text);
+  }
+
+  /* خلفية الاسم — متجاوب ويحافظ على الأداء */
+  .bg-name{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+    user-select:none;
+    z-index:0;
+  }
+  .bg-name span{
+    font-weight:900;
+    letter-spacing:6px;
+    color: rgba(234,128,176,0.06);
+    text-shadow: 0 0 40px rgba(234,128,176,0.06);
+    filter: blur(1.5px);
+    white-space:nowrap;
+    font-size: clamp(48px, 22vw, 320px);
+    line-height:1;
+    transform: translateY(2%);
+  }
+
+  /* حاوية القلب — متجاوبة */
+  #heart{
+    position:relative;
+    width: min(82vw, 460px);
+    height: min(82vw, 460px);
+    z-index:2;
+    touch-action:none;
+  }
+
+  /* كل كلمة حول محيط القلب */
+  .word{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform-origin:50% 50%;
+    color:var(--accent);
+    font-size: clamp(10px, 2.2vw, 18px);
+    letter-spacing:1.2px;
+    white-space:nowrap;
+    text-shadow: 0 0 8px var(--accent), 0 0 18px rgba(234,128,176,0.45);
+    will-change:transform,opacity;
+    pointer-events:none; /* حتى يتمكن المستخدم من الضغط على الأزرار أسفلها */
+    user-select:none;
+    -webkit-user-select:none;
+    opacity:0.96;
+    filter: none;
+    animation: heartbeat 1.6s ease-in-out infinite;
+  }
+
+  @keyframes heartbeat{
+    0%,100% { transform: translate(-50%,-50%) rotate(var(--angle)) scale(1); }
+    50%    { transform: translate(-50%,-50%) rotate(var(--angle)) scale(1.06); }
+  }
+
+  /* زر تشغيل الموسيقى قابل للمس على الجوال */
+  #playBtn{
+    position:fixed;
+    left:50%;
+    transform:translateX(-50%);
+    bottom: 6%;
+    background: linear-gradient(180deg, rgba(234,128,176,0.18), rgba(234,128,176,0.10));
+    border: 1px solid rgba(234,128,176,0.9);
+    color:var(--text);
+    padding: 12px 18px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 16px;
+    z-index:6;
+    cursor:pointer;
+    backdrop-filter: blur(4px);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .glow-text{
+    position:fixed;
+    bottom: calc(6% + 64px);
+    left:0;
+    right:0;
+    text-align:center;
+    color:var(--text);
+    font-size: clamp(16px, 4vw, 28px);
+    letter-spacing:6px;
+    text-shadow: 0 0 14px var(--accent);
+    z-index:5;
+    pointer-events:none;
+  }
+
+  /* للمستخدمين الذين يفضلون تقليل الحركة */
+  @media (prefers-reduced-motion: reduce){
+    .word { animation: none; }
+  }
+
+  /* تصغير الظلال على شاشات صغيرة لتحسين الوضوح */
+  @media (max-width:420px){
+    .bg-name span { letter-spacing:3px; }
+    .word { text-shadow: 0 0 6px var(--accent); }
+  }
+</style>
+</head>
+<body>
+
+  <div class="bg-name" aria-hidden="true"><span>Romaissaa</span></div>
+
+  <div id="heart" aria-hidden="true"></div>
+
+  <div class="glow-text" aria-hidden="true">I LOVE YOU</div>
+
+  <!-- ضع ملف الموسيقى باسم music.mp3 في نفس المجلد -->
+  <audio id="bgMusic" src="music.mp3" loop preload="none"></audio>
+  <button id="playBtn" aria-pressed="false" onclick="toggleMusic()">🔊 تشغيل الموسيقى</button>
+
+<script>
+  // تحسين للاستجابة: نحسب حجم القلب اعتمادًا على حجم الحاوية
+  const heart = document.getElementById('heart');
+  const text = " I LOVE YOU • ";
+  const POINTS = 140; // أكثر نقاط => حواف سلسة
+
+  // معادلة القلب (t من 0 -> 2π)
+  function heartPoint(t){
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+    return {x,y};
+  }
+
+  // نعيد بناء العناصر (مفيدة عند إعادة القياس)
+  let spans = [];
+  function buildHeart(){
+    // نظف القديم
+    heart.innerHTML = '';
+    spans = [];
+
+    const rect = heart.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    // مقياس يعتمد على حجم الحاوية -> يبقى القلب مناسباً للهاتف
+    // المعامل 18 يعطي حجم مناسب للتجربة؛ يمكن تعديله إن رغبت
+    const scale = Math.min(rect.width, rect.height) / 18;
+
+    for (let i = 0; i < POINTS; i++){
+      const t = (i / POINTS) * Math.PI * 2;
+      const p = heartPoint(t);
+      const px = centerX + p.x * scale;
+      const py = centerY + p.y * scale;
+      const angle = (t * 180 / Math.PI) + 90;
+
+      const span = document.createElement('div');
+      span.className = 'word';
+      span.textContent = text;
+      span.style.left = px + 'px';
+      span.style.top  = py + 'px';
+      span.style.setProperty('--angle', angle + 'deg');
+
+      // تعديل الحجم الخفيف لكل كلمة للحصول على مظهر متدرج
+      const s = 0.9 + 0.4 * Math.sin(t * 3 + i * 0.1);
+      span.style.fontSize = `calc(${getComputedFontSize()} * ${s})`;
+
+      // تأخير بسيط للاanimation لخلق احساس نبض متناغم
+      span.style.animationDelay = (i * 0.01) + 's';
+
+      heart.appendChild(span);
+      spans.push(span);
+    }
+  }
+
+  // نحصل على حجم خط افتراضي كنسبة مئوية من الحاوية (للمحافظة على تناسق حجم النص)
+  function getComputedFontSize(){
+    // قيمة أساسية متناسبة مع عرض الحاوية
+    const w = heart.getBoundingClientRect().width;
+    const size = Math.max(10, Math.min(18, w * 0.04)); // نضمن حد أدنى وأقصى
+    return size + 'px';
+  }
+
+  // نعيد البناء عند التحميل أو تغيير حجم الشاشة
+  window.addEventListener('load', () => {
+    buildHeart();
+    // بعد تحميل الصفحة، إذا كانت الشاشة تتغير (تدوير الهاتف) نعيد البناء مع تأخير طفيف
+    let t;
+    window.addEventListener('resize', () => {
+      clearTimeout(t);
+      t = setTimeout(buildHeart, 120);
+    });
+    // أيضاً نعيد البناء على تغيير DPI (zoom) أو عند تغيير الواجهة
+    new MutationObserver(() => { clearTimeout(t); t = setTimeout(buildHeart, 160); }).observe(document.documentElement, { attributes:true });
+
+  });
+
+  // زر الموسيقى (لا تعمل التشغيل التلقائي على أغلب الهواتف - تحتاج نقر المستخدم)
+  function toggleMusic(){
+    const audio = document.getElementById('bgMusic');
+    const btn = document.getElementById('playBtn');
+    if (audio.paused){
+      audio.play().then(() => {
+        btn.textContent = '🔇 إيقاف الموسيقى';
+        btn.setAttribute('aria-pressed','true');
+      }).catch(()=> {
+        // فشل في التشغيل التلقائي: نعرض رسالة صغيرة بدلًا من خطأ (هنا نكتفي بتغيير النص)
+        btn.textContent = '▶ تشغيل (انقر مرة أخرى)';
+        btn.setAttribute('aria-pressed','false');
+      });
+    } else {
+      audio.pause();
+      btn.textContent = '🔊 تشغيل الموسيقى';
+      btn.setAttribute('aria-pressed','false');
+    }
+  }
+
+  // منع اللمس المزدوج من التكبير على الهواتف (تحسين التفاعل)
+  document.addEventListener('touchstart', function preventZoom(e){
+    if (e.touches.length > 1){
+      e.preventDefault();
+    }
+  }, { passive:false });
+
+</script>
+
+</body>
+</html>
